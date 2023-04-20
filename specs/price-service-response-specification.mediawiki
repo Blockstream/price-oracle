@@ -13,7 +13,7 @@
 This document proposes a standard for a price oracle. The price service or price oracle is a web service that provides a signed message attesting to the price of Bitcoin at a given time in a specified fiat currency.
 
 ===Motivation===
-Covenants and Contracts require a reference asset price. The price service provides a signed price timestamp that can be used directly in Script. To allow for future variations of the pricing message format, a prefix code is embedded at the front of each pricing message.
+Covenants and contracts require a reference asset price. The price service provides a signed price and timestamp message that can be used directly in Script. To allow for future variations of the pricing message format, a prefix code is embedded at the front of each price message.
 
 ==Description==
 
@@ -29,27 +29,29 @@ In response to an HTTP GET request, the price service responds with a JSON respo
 
 <code>
 {
-  "timestamp": "<Unix Epoch Time in Microseconds of price time>",
+  "timestamp": "<Unix Epoch Time in microseconds of message time>",
   "lastPrice": "<Price>",
   "attestation": {
-	"signature": "<hex encoded 64 byte signature of tagged message hash>",
-      "publicKey": "<hex encoded 32 byte public key of price service>",
-	  "message": "<hex encoded price message, see below>",
-	  "messageHash": "<hex encoded tagged message hash>",
-      "messageTag": "<tag used for message hash>"
+    "signature": "<hex encoded 64 byte signature of tagged message hash>",
+    "publicKey": "<hex encoded 32 byte public key of price service>",
+    "message": "<hex encoded price message, see below>",
+    "messageHash": "<hex encoded tagged message hash>",
+    "messageTag": "<tag used for message hash>"
   },
   "disclaimer: "<legal disclaimer intended for human readers, with URL>"
 }
 </code>
+
+The ordering of keys in the JSON response is not specified. Non-significant whitespace may be present in the JSON response.
 
 The `timestamp` and `lastPrice` fields are intended as human-readable forms of the fields encoded in the `message`.
 
 ===Price Message===
 
 The price message is variable length and format.
-The first four bytes of the message are an ASCII string that defines its format; currently the only defined format is “le64”.
+The first four bytes of the message are an ASCII string that defines its format; currently the only defined format is "le64".
 
-“le64” messages are 23 bytes long and consist of the following fields in order:
+"le64" messages are 23 bytes long and consist of the following fields in order:
 
 {| class="wikitable" style="margin:auto"
 ! Header Field !! Header Value !! Header Length (bytes)
@@ -70,13 +72,13 @@ Note that the "le64" format only defines conversions from Bitcoin to fiat curren
 
 Suppose 1 Bitcoin could be sold for $17,542.61 USD on 11:33:01 AM PST on Jan 10, 2023.
 
-The prefix “le64” is “6c653634” as a hex string.
+The prefix "le64" is "6c653634" as a hex string.
 
 The epoch timestamp in microseconds for that date and time is 1673379181000000, or 0x5f1edf3a87540.
 
 The price in USD cents of 1 bitcoin was 1754261, or 0x1ac495.
 
-The currency code “USD” is “555344” as a hex string.
+The currency code "USD" is "555344" as a hex string.
 
 Thus, the price message hex-encoded string is 6c6536345553444075a8f3edf1050095c41a0000000000
 

@@ -1,31 +1,64 @@
 <pre>
- Title: Price Service Response Specification
+ Title: Price Service Message Specification
  Author: Phil McLean <phil@blockstream.com>
  Status: Active
  Created: 2023-04-20
  License: BSD-2-Clause
-          GNU-All-Permissive
 </pre>
+
 
 ==Introduction==
 
+
 ===Abstract===
-This document proposes a standard for a price oracle. The price service or price oracle is a web service that provides a signed message attesting to the price of Bitcoin at a given time in a specified fiat currency.
+
+A price service or price oracle is a service that provides a signed
+message attesting to the price of Bitcoin at a given time in a
+specified fiat currency.
+
+This document is a specification for the price service message.
+
 
 ===Motivation===
-Covenants and contracts require a reference asset price. The price service provides a signed price and timestamp message that can be used directly in Script. To allow for future variations of the pricing message format, a prefix code is embedded at the front of each price message.
+
+Covenants and contracts require a reference asset price. A price
+service provides a signed price and timestamp message that can be used
+directly in Bitcoin or Liquid Script.
+
+JavaScript Object Notation (JSON) is used as a document format,
+for its interoperability and ease of interpretation by humans. 
+
+To avoid the need for a variable decimal point, this specification is
+limited to representing the price of BTC in fiat currencies with 2
+decimal places (cents).
+
+To allow for future variations of the pricing message format, a format
+code identifying the price message format is defined and associated
+with the message. 
+
 
 ==Description==
 
-The price service provides a JSON document containing a timestamp, a price, a price message encoding the timestamp, price, and currency, and a signature of the price message. The signature is a Schnorr signature of a tagged hash of the message, as described in BIP-340 [1].
+The price service generates a JSON document containing a timestamp, a
+price, a price message encoding the timestamp, price, and currency,
+and a signature of the price message.
 
-The price service response contains all data necessary to verify the price message and its signature.
+The signature is a Schnorr signature of a tagged hash of the message,
+as described in BIP-340 [1]. 
 
-Key management is outside the scope of this document.
+The format code of the message is used as a prefix for the tagged
+hash. 
 
-===Price Service Response===
+The price service response contains all data required to verify the
+price message and its signature.
 
-In response to an HTTP GET request, the price service responds with a JSON response body with the following format:
+Key management and distribution is outside the scope of this
+document. 
+
+
+===Price Service Message===
+
+The price service message is a JSON document with the following format:
 
 <code>
 {
@@ -33,30 +66,34 @@ In response to an HTTP GET request, the price service responds with a JSON respo
   "lastPrice": "<Price>",
   "attestation": {
     "signature": "<hex encoded 64 byte signature of tagged message hash>",
-    "publicKey": "<hex encoded 32 byte public key of price service>",
-    "message": "<hex encoded price message, see below>",
-    "messageHash": "<hex encoded tagged message hash>",
-    "messageTag": "<tag used for message hash>"
+    "publicKey": "<hex encoded 32 byte public key of the price service>",
+    "priceMessage": "<hex encoded price message>",
+    "priceMessageHash": "<hex encoded tagged price message hash>",
+    "priceMessageTag": "<tag used for price message hash>"
   },
   "disclaimer: "<legal disclaimer intended for human readers, with URL>"
 }
 </code>
 
-The ordering of keys in the JSON response is not specified. Non-significant whitespace may be present in the JSON response.
+The ordering of keys in the JSON document is not
+specified. Non-significant whitespace may be present in the JSON
+document.
 
-The `timestamp` and `lastPrice` fields are intended as human-readable forms of the fields encoded in the `message`.
+The `timestamp` and `lastPrice` fields are intended as human-readable
+forms of the fields encoded in the `message`. They should be the same
+as the corresponding values encoded in the `priceMessage`. 
+
 
 ===Price Message===
 
 The price message is variable length and format.
-The first four bytes of the message are an ASCII string that defines its format; currently the only defined format is "le64".
 
-"le64" messages are 23 bytes long and consist of the following fields in order:
+This document defines one format of message, with name and format code "le64".
+
+"le64" messages are 19 bytes long and consist of the following fields in order:
 
 {| class="wikitable" style="margin:auto"
 ! Header Field !! Header Value !! Header Length (bytes)
-|-
-| 4 byte prefix code || ASCII encoding of string "le64" || 4
 |-
 | 3 byte currency code || ASCII encoding of fiat currency code ISO 4217 code e.g. "USD" || 3
 |-
@@ -65,8 +102,41 @@ The first four bytes of the message are an ASCII string that defines its format;
 | 64 bit price || little-endian 64 bit unsigned integer of price in cents || 8
 |}
 
+Note that the "le64" format only defines conversions from Bitcoin to
+fiat currencies. "le64" does not support cryptocurrencies other than
+Bitcoin, and does not support the inverted trading pair, which may
+require a finer precision than cents. 
 
-Note that the "le64" format only defines conversions from Bitcoin to fiat currencies. It does not support cryptocurrencies other than Bitcoin, and does not support the inverted trading pair, which may require a finer precision than cents.
+===Price Message Tag and Format Code===
+
+To prevent price message signatures from use in other contexts,
+this specification adopts the tagged-hash scheme defined
+in BIP-340 [1].  
+
+The tagged hash of a message x is computed as
+
+<code>
+tagged_hash(x) = SHA256( SHA256(tag) || SHA256(tag) || x)
+</code>
+
+where `x` is the price message, `tag` is a short ascii string unique
+to the instance of the price oracle, and `||` is concatenation.
+
+The message tag should be unique to the instance of the price service
+generating the message.
+
+In order to communicate the format code, the message tag must be
+prefixed with the format code. 
+
+An example of a message tag is "le64-price-oracle-X-1.0".
+
+An optimized implementation of a price oracle can precompute a SHA256
+midstate for subsequent price messages.
+
+===Signature===
+
+The price message is signed using a Schnorr signature over the tagged
+message hash, as described in BIP-340.
 
 ===Example Price Message===
 
@@ -82,25 +152,10 @@ The currency code "USD" is "555344" as a hex string.
 
 Thus, the price message hex-encoded string is 6c6536345553444075a8f3edf1050095c41a0000000000
 
-===Signature===
-
-The price message is signed using a Schnorr signature over the tagged message hash, as described in BIP-340. The tag should be defined for the instance of the price service, and is used to prevent the reuse of the signature in a different context.
-
-The tagged hash of a message x is computed as
-
-<code>
-tagged_hash(x) = SHA256( SHA256(tag) || SHA256(tag) || x)
-</code>
-
-where x is the price message, and tag is a short ascii string unique to the instance of the price oracle, and || is concatenation.
-
-
-===API Authentication===
-API Authentication is outside the scope of this document.
-
 ===Price Service Frequency===
 
-The frequency and and timeliness of the pricing information is outside the scope of this document.
+The frequency and timeliness of the pricing information is outside
+the scope of this specification.
 
 ==References==
 

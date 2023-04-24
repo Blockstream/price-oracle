@@ -150,7 +150,7 @@ The price in USD cents of 1 bitcoin was 1754261, or 0x1ac495.
 
 The currency code "USD" is "555344" as a hex string.
 
-Thus, the price message hex-encoded string is 6c6536345553444075a8f3edf1050095c41a0000000000
+Thus, the price message hex-encoded string is "4075a8f3edf1050095c41a0000000000555344".
 
 ===Price Service Frequency===
 
